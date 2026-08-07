@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Web Vulnerability Scanner</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="popup-shell">
+    <header class="app-header">
+      <div class="brand-badge">
+        <span class="brand-orb"></span>
+        <img src="icons/icon48.png" alt="logo" class="logo" />
+      </div>
+      <div class="title-wrap">
+        <h1>Web Vulnerability Scanner</h1>
+        <p class="subtitle">Passive + Active Security Assessment</p>
+      </div>
+    </header>
+
+    <section class="glass-card site-card">
+      <div class="site-head">
+        <img src="icons/icon48.png" alt="favicon" class="site-favicon" />
+        <div class="site-copy">
+          <span class="eyebrow">Current Website</span>
+          <strong id="currentUrl">Loading current tab...</strong>
+        </div>
+      </div>
+
+      <div class="meta-grid">
+        <div class="meta-chip">
+          <span>IP Address</span>
+          <strong>192.168.0.24</strong>
+        </div>
+        <div class="meta-chip">
+          <span>HTTPS</span>
+          <strong>Enabled</strong>
+        </div>
+        <div class="meta-chip">
+          <span>Server</span>
+          <strong>Apache / Nginx</strong>
+        </div>
+        <div class="meta-chip">
+          <span>Scan Time</span>
+          <strong>2.4s</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="glass-card score-panel">
+      <div class="score-ring">
+        <div class="score-ring-inner">
+          <span class="score-label">Security Score</span>
+          <strong id="scoreValue">82 / 100</strong>
+          <small id="scoreStatus">Low Risk</small>
+        </div>
+      </div>
+
+      <div class="score-details">
+        <div class="detail-row">
+          <span>Risk Level</span>
+          <strong class="riskTone">Low</strong>
+        </div>
+        <div class="detail-row">
+          <span>Checks Passed</span>
+          <strong>12</strong>
+        </div>
+        <div class="detail-row">
+          <span>Findings</span>
+          <strong>3</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats-grid">
+      <article class="stat-card">
+        <span class="stat-icon">⚠</span>
+        <div>
+          <strong>3</strong>
+          <small>High Risk</small>
+        </div>
+      </article>
+      <article class="stat-card">
+        <span class="stat-icon">◎</span>
+        <div>
+          <strong>4</strong>
+          <small>Medium Risk</small>
+        </div>
+      </article>
+      <article class="stat-card">
+        <span class="stat-icon">✓</span>
+        <div>
+          <strong>12</strong>
+          <small>Passed Checks</small>
+        </div>
+      </article>
+    </section>
+
+    <div class="scan-options">
+      <label class="switch-label">
+        <input type="checkbox" id="activeScanToggle" />
+        <span>Enable Active Scan</span>
+      </label>
+    </div>
+
+    <div class="action-row">
+      <button id="scanBtn" class="primary-btn">Start Passive Scan</button>
+      <button id="activeBtn" class="secondary-btn">Run Active Scan</button>
+    </div>
+
+    <div id="progressArea" class="hidden">
+      <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+      <p id="progressText">Initializing scan pipeline...</p>
+    </div>
+
+    <div id="resultArea" class="hidden">
+      <div class="result-score">
+        <div id="riskBadge" class="risk-badge">--</div>
+        <div>
+          <p class="result-label">Risk Classification</p>
+          <p id="confidenceText" class="confidence-text">Confidence: --</p>
+        </div>
+      </div>
+
+      <ul id="findingsList" class="findings-list"></ul>
+
+      <div class="result-actions">
+        <button id="viewDashboardBtn" class="secondary-btn">Open Full Dashboard</button>
+        <button class="ghost-btn">Export Report</button>
+      </div>
+    </div>
+
+    <section class="glass-card timeline-card">
+      <div class="section-title-row">
+        <h3>Recent Activity</h3>
+        <span class="live-dot"></span>
+      </div>
+      <ul class="timeline-list">
+        <li><span>Passive Scan Completed</span><small>Just Now</small></li>
+        <li><span>Cookies Analyzed</span><small>2 min ago</small></li>
+        <li><span>Security Headers Checked</span><small>5 min ago</small></li>
+        <li><span>Dashboard Updated</span><small>10 min ago</small></li>
+      </ul>
+    </section>
+
+    <nav class="bottom-nav">
+      <button class="nav-pill active">Dashboard</button>
+      <button class="nav-pill">History</button>
+      <button class="nav-pill">Settings</button>
+      <button class="nav-pill">About</button>
+    </nav>
+
+    <div id="errorArea" class="error-box hidden"></div>
+  </div>
+
+  <script src="utils.js"></script>
+  <script src="storage.js"></script>
+  <script src="api.js"></script>
+  <script src="featureExtractor.js"></script>
+  <script src="passiveScanner.js"></script>
+  <script src="activeScanner.js"></script>
+  <script src="scanner.js"></script>
+  <script src="dashboardLink.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
