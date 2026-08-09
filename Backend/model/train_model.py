@@ -11,7 +11,7 @@ from sklearn.model_selection import (
     StratifiedKFold,
     cross_val_score,
 )
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.tree import DecisionTreeClassifier, plot_tree
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
@@ -229,6 +229,24 @@ model.fit(
     X_train,
     y_train
 )
+
+# ============================================================
+# SHOW DECISION TREE FIGURE
+# ============================================================
+
+plt.figure(figsize=(18, 12))
+plot_tree(
+    model,
+    feature_names=FEATURE_COLUMNS,
+    class_names=sorted(y.unique()),
+    filled=True,
+    rounded=True,
+    proportion=True,
+    fontsize=9,
+)
+plt.title("Decision Tree Structure")
+plt.tight_layout()
+plt.show()
 
 
 # ============================================================
