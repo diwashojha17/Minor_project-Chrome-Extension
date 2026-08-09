@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
-
+import matplotlib.pyplot as plt
+from numpy import matrix
+import seaborn as sns
 import joblib
 import pandas as pd
 
@@ -259,27 +261,18 @@ print(
     )
 )
 
+# Confusion matrix heatmap
+labels = sorted(df['label'].unique())
+data = confusion_matrix(y_test, predictions, labels=labels)
 
+plt.figure(figsize=(8, 6))
+sns.heatmap(data, annot=True, fmt='d', cmap='Blues', cbar=False,
+            xticklabels=labels, yticklabels=labels)
+plt.title('Confusion Matrix')
+plt.xlabel('Predicted Label')
+plt.ylabel('True Label')
+plt.show()
 print("Confusion Matrix:")
-
-labels = sorted(
-    y.unique()
-)
-
-matrix = confusion_matrix(
-    y_test,
-    predictions,
-    labels=labels
-)
-
-matrix_df = pd.DataFrame(
-    matrix,
-    index=labels,
-    columns=labels
-)
-
-print(matrix_df)
-
 
 # ============================================================
 # 3-FOLD CROSS VALIDATION
