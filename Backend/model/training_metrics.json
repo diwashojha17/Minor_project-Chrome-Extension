@@ -1,0 +1,13 @@
+{
+  "dataset_rows": 2000,
+  "feature_count": 33,
+  "accuracy": 0.784,
+  "cross_validation_accuracy": 0.8604946775861319,
+  "classes": [
+    "CRITICAL",
+    "HIGH",
+    "LOW",
+    "MEDIUM",
+    "SAFE"
+  ]
+}
