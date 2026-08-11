@@ -1,66 +1,414 @@
 /**
  * background.js
- * Manifest V3 service worker. Handles installation setup, header inspection
- * via webRequest, and message routing between popup/content scripts.
+ *
+ * Manifest V3 service worker.
+ *
+ * Responsibilities:
+ * - Store default settings
+ * - Capture main-page response headers
+ * - Cache HTTP status
+ * - Supply response headers to passiveScanner.js
+ * - Supply cookies to passiveScanner.js
  */
 
-// Cache of response headers keyed by tab id, populated via webRequest listener.
-// Content scripts cannot see response headers directly, so background captures them.
+
+/* =========================================
+   MEMORY HEADER CACHE
+========================================= */
+
 const tabHeaderCache = {};
 
+
+/* =========================================
+   SESSION CACHE KEY
+========================================= */
+
+function getHeaderCacheKey(tabId) {
+  return `header_cache_${tabId}`;
+}
+
+
+/* =========================================
+   EXTENSION INSTALL
+========================================= */
+
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("[AI Vulnerability Scanner] Extension installed.");
-  chrome.storage.local.get("scanner_settings", (data) => {
-    if (!data.scanner_settings) {
-      chrome.storage.local.set({
-        scanner_settings: {
-          backendUrl: "http://127.0.0.1:5000",
-          allowActiveScan: false,
-          theme: "dark"
-        }
-      });
+
+  console.log(
+    "[AI Vulnerability Scanner] Extension installed."
+  );
+
+
+  chrome.storage.local.get(
+    "scanner_settings",
+    (data) => {
+
+      if (
+        !data.scanner_settings
+      ) {
+
+        chrome.storage.local.set({
+
+          scanner_settings: {
+
+            backendUrl:
+              "http://127.0.0.1:5000",
+
+            allowActiveScan:
+              false,
+
+            theme:
+              "dark"
+
+          }
+
+        });
+      }
+
     }
-  });
+  );
 });
 
-// Capture response headers for security header analysis (CSP, HSTS, X-Frame-Options, etc.)
+
+/* =========================================
+   CAPTURE RESPONSE HEADERS
+========================================= */
+
 chrome.webRequest.onHeadersReceived.addListener(
+
   (details) => {
-    if (details.type === "main_frame") {
-      const headers = {};
-      (details.responseHeaders || []).forEach((h) => {
-        headers[h.name.toLowerCase()] = h.value;
-      });
-      tabHeaderCache[details.tabId] = {
-        url: details.url,
-        status: details.statusCode,
-        headers
-      };
+
+    /*
+     * Only the main website response is
+     * stored.
+     */
+
+    if (
+      details.tabId < 0
+    ) {
+      return;
     }
+
+
+    const headers = {};
+
+
+    (
+      details.responseHeaders || []
+    ).forEach(
+      (header) => {
+
+        if (
+          !header?.name
+        ) {
+          return;
+        }
+
+
+        const name =
+          header.name.toLowerCase();
+
+
+        const value =
+          header.value || "";
+
+
+        /*
+         * If a header appears more than once,
+         * preserve all values.
+         */
+
+        if (
+          headers[name]
+        ) {
+
+          headers[name] =
+            `${headers[name]}, ${value}`;
+
+        } else {
+
+          headers[name] =
+            value;
+        }
+
+      }
+    );
+
+
+    const headerRecord = {
+
+      url:
+        details.url,
+
+      /*
+       * Keep both names for compatibility.
+       */
+
+      status:
+        details.statusCode,
+
+      statusCode:
+        details.statusCode,
+
+      headers,
+
+      timestamp:
+        Date.now()
+
+    };
+
+
+    /* Fast in-memory cache */
+
+    tabHeaderCache[
+      details.tabId
+    ] =
+      headerRecord;
+
+
+    /*
+     * Session cache survives service-worker
+     * suspension/restart.
+     */
+
+    const key =
+      getHeaderCacheKey(
+        details.tabId
+      );
+
+
+    chrome.storage.session.set({
+
+      [key]:
+        headerRecord
+
+    }).catch(
+      (error) => {
+
+        console.warn(
+          "Could not save header cache:",
+          error
+        );
+      }
+    );
+
   },
-  { urls: ["http://*/*", "https://*/*"] },
-  ["responseHeaders"]
+
+  {
+    urls: [
+      "http://*/*",
+      "https://*/*"
+    ],
+
+    types: [
+      "main_frame"
+    ]
+  },
+
+  [
+    "responseHeaders"
+  ]
 );
 
-// Message router: popup/content scripts request cached headers or trigger actions.
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === "GET_CACHED_HEADERS") {
-    const tabId = message.tabId;
-    sendResponse(tabHeaderCache[tabId] || null);
-    return true;
+
+/* =========================================
+   MESSAGE ROUTER
+========================================= */
+
+chrome.runtime.onMessage.addListener(
+  (
+    message,
+    sender,
+    sendResponse
+  ) => {
+
+
+    /* -------------------------------------
+       GET RESPONSE HEADERS
+    ------------------------------------- */
+
+    if (
+      message.type ===
+      "GET_CACHED_HEADERS"
+    ) {
+
+      const tabId =
+        message.tabId;
+
+
+      /* First try memory */
+
+      const memoryResult =
+        tabHeaderCache[
+          tabId
+        ];
+
+
+      if (
+        memoryResult
+      ) {
+
+        sendResponse(
+          memoryResult
+        );
+
+        return false;
+      }
+
+
+      /*
+       * Memory may be empty if the Manifest V3
+       * service worker restarted.
+       *
+       * Try session storage.
+       */
+
+      const key =
+        getHeaderCacheKey(
+          tabId
+        );
+
+
+      chrome.storage.session
+        .get(key)
+        .then(
+          (data) => {
+
+            const record =
+              data[key] ||
+              null;
+
+
+            if (
+              record
+            ) {
+
+              tabHeaderCache[
+                tabId
+              ] =
+                record;
+            }
+
+
+            sendResponse(
+              record
+            );
+          }
+        )
+        .catch(
+          (error) => {
+
+            console.warn(
+              "Header cache lookup failed:",
+              error
+            );
+
+            sendResponse(
+              null
+            );
+          }
+        );
+
+
+      return true;
+    }
+
+
+    /* -------------------------------------
+       GET COOKIES
+    ------------------------------------- */
+
+    if (
+      message.type ===
+      "GET_COOKIES_FOR_URL"
+    ) {
+
+      if (
+        !message.url
+      ) {
+
+        sendResponse([]);
+
+        return false;
+      }
+
+
+      chrome.cookies.getAll(
+        {
+          url:
+            message.url
+        },
+
+        (cookies) => {
+
+          if (
+            chrome.runtime.lastError
+          ) {
+
+            console.warn(
+              "Cookie lookup failed:",
+              chrome.runtime
+                .lastError
+                .message
+            );
+
+
+            sendResponse([]);
+
+            return;
+          }
+
+
+          sendResponse(
+            cookies || []
+          );
+        }
+      );
+
+
+      /*
+       * Keep message channel open because
+       * chrome.cookies.getAll is asynchronous.
+       */
+
+      return true;
+    }
+
+
+    return false;
   }
+);
 
-  if (message.type === "GET_COOKIES_FOR_URL") {
-    chrome.cookies.getAll({ url: message.url }, (cookies) => {
-      sendResponse(cookies);
-    });
-    return true; // keep channel open for async response
+
+/* =========================================
+   CLEAN CACHE WHEN TAB CLOSES
+========================================= */
+
+chrome.tabs.onRemoved.addListener(
+  (tabId) => {
+
+    delete tabHeaderCache[
+      tabId
+    ];
+
+
+    const key =
+      getHeaderCacheKey(
+        tabId
+      );
+
+
+    chrome.storage.session
+      .remove(key)
+      .catch(
+        (error) => {
+
+          console.warn(
+            "Could not remove header cache:",
+            error
+          );
+        }
+      );
+
   }
-
-  return false;
-});
-
-// Clean up cache when a tab is closed to avoid unbounded memory growth.
-chrome.tabs.onRemoved.addListener((tabId) => {
-  delete tabHeaderCache[tabId];
-});
+);

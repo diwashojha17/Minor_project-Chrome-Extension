@@ -2,7 +2,8 @@
   "manifest_version": 3,
   "name": "AI Web Vulnerability Scanner",
   "version": "1.0.0",
-  "description": "AI-powered passive & active web application security scanner with Decision Tree risk classification and interactive dashboard.",
+  "description": "AI-powered passive and authorized active web application security scanner with Decision Tree risk classification and interactive dashboard.",
+
   "permissions": [
     "activeTab",
     "storage",
@@ -12,13 +13,16 @@
     "tabs",
     "downloads"
   ],
+
   "host_permissions": [
     "http://*/*",
     "https://*/*"
   ],
+
   "background": {
     "service_worker": "background.js"
   },
+
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -27,14 +31,7 @@
       "128": "icons/icon128.png"
     }
   },
-  "options_page": "options.html",
-  "content_scripts": [
-    {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["content.js"],
-      "run_at": "document_idle"
-    }
-  ],
+
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

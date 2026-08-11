@@ -1,70 +1,284 @@
 /**
  * content.js
- * Injected into every page. Provides DOM-level inspection utilities that
- * the popup can invoke via chrome.scripting.executeScript or messaging.
- * Purely passive/read-only inspection of the current page's own DOM.
+ * Read-only DOM inspection for the current page.
  */
 
-/** Collect all <form> elements and whether they contain password fields. */
 function collectForms() {
-  const forms = Array.from(document.querySelectorAll("form"));
-  return forms.map((form) => ({
-    action: form.action || null,
-    method: (form.method || "GET").toUpperCase(),
-    hasPasswordField: !!form.querySelector('input[type="password"]'),
-    fieldCount: form.querySelectorAll("input, textarea, select").length
-  }));
+  const tokenPattern =
+    /csrf|xsrf|token|nonce|authenticity|verification/i;
+
+  return Array.from(document.forms).map((form) => {
+    const fields = Array.from(form.elements).map((el) => ({
+      name: el.name || "",
+      id: el.id || "",
+      type: (el.type || el.tagName || "").toLowerCase(),
+      required: Boolean(el.required),
+      disabled: Boolean(el.disabled),
+      accept: el.accept || "",
+      autocomplete: el.autocomplete || "",
+      hasValue:
+        el.type === "password"
+          ? Boolean(el.value)
+          : Boolean(el.value)
+    }));
+
+    const hasCsrfToken = fields.some((field) =>
+      tokenPattern.test(`${field.name} ${field.id}`)
+    );
+
+    return {
+      action: form.action || location.href,
+      method: (form.method || "GET").toUpperCase(),
+      enctype: form.enctype || "",
+      hasPasswordField: fields.some(
+        (field) => field.type === "password"
+      ),
+      hasFileField: fields.some(
+        (field) => field.type === "file"
+      ),
+      hasCsrfToken,
+      fieldCount: fields.length,
+      fields
+    };
+  });
 }
 
-/** Collect external and inline script information. */
+
 function collectScripts() {
-  const scripts = Array.from(document.querySelectorAll("script"));
-  const external = scripts.filter((s) => s.src).map((s) => s.src);
-  const inlineCount = scripts.filter((s) => !s.src && s.textContent.trim().length > 0).length;
-  return { externalScripts: external, inlineScriptCount: inlineCount };
-}
+  const scripts = Array.from(document.scripts);
 
-/** Detect mixed content: page is HTTPS but references HTTP resources. */
-function detectMixedContent() {
-  if (location.protocol !== "https:") return [];
-  const resources = Array.from(document.querySelectorAll("img, script, link, iframe"));
-  const mixed = resources
-    .map((el) => el.src || el.href)
-    .filter((url) => url && url.startsWith("http://"));
-  return mixed;
-}
+  const externalScripts = scripts
+    .filter((script) => script.src)
+    .map((script) => script.src);
 
-/** Basic technology fingerprinting from meta tags and global variables. */
-function fingerprintTechnology() {
-  const generator = document.querySelector('meta[name="generator"]');
-  const techHints = [];
-  if (generator) techHints.push(generator.content);
-  if (window.jQuery) techHints.push(`jQuery ${window.jQuery.fn.jquery}`);
-  if (window.React) techHints.push("React");
-  if (window.angular) techHints.push("AngularJS");
-  if (document.querySelector('[data-reactroot], #__next')) techHints.push("React/Next.js");
-  if (document.querySelector('meta[name="generator"][content*="WordPress"]')) techHints.push("WordPress");
-  return techHints;
-}
+  const inlineScripts = scripts
+    .filter(
+      (script) =>
+        !script.src &&
+        script.textContent.trim()
+    )
+    .map((script) => script.textContent);
 
-/** Gather a snapshot of page-level passive data. Triggered on demand via message. */
-function gatherPassiveDomData() {
   return {
-    url: location.href,
-    isHttps: location.protocol === "https:",
-    forms: collectForms(),
-    scripts: collectScripts(),
-    mixedContent: detectMixedContent(),
-    technology: fingerprintTechnology(),
-    linkCount: document.querySelectorAll("a[href]").length,
-    title: document.title
+    externalScripts,
+    inlineScriptCount: inlineScripts.length
   };
 }
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === "COLLECT_PASSIVE_DOM_DATA") {
-    sendResponse(gatherPassiveDomData());
-    return true;
+
+function analyzeDomJavascript() {
+  const source = Array.from(document.scripts)
+    .filter((script) => !script.src)
+    .map((script) => script.textContent)
+    .join("\n")
+    .toLowerCase();
+
+  const sources = [
+    "location.hash",
+    "location.search",
+    "location.href",
+    "document.url",
+    "document.location",
+    "window.name"
+  ];
+
+  const sinks = [
+    ".innerhtml",
+    ".outerhtml",
+    "document.write(",
+    "document.writeln(",
+    "eval(",
+    "insertadjacenthtml("
+  ];
+
+  const sourceMatches = sources.filter(
+    (item) => source.includes(item)
+  );
+
+  const sinkMatches = sinks.filter(
+    (item) => source.includes(item)
+  );
+
+  return {
+    sourceCount: sourceMatches.length,
+    sinkCount: sinkMatches.length,
+    sources: sourceMatches,
+    sinks: sinkMatches,
+    potentialDomXss:
+      sourceMatches.length > 0 &&
+      sinkMatches.length > 0
+  };
+}
+
+
+function detectMixedContent() {
+  if (location.protocol !== "https:") {
+    return [];
   }
-  return false;
-});
+
+  return Array.from(
+    document.querySelectorAll(
+      "img, script, link, iframe, audio, video, source"
+    )
+  )
+    .map((element) =>
+      element.src || element.href || ""
+    )
+    .filter((url) =>
+      url.startsWith("http://")
+    );
+}
+
+
+function fingerprintTechnology() {
+  const technologies = new Set();
+
+  const generator =
+    document.querySelector(
+      'meta[name="generator"]'
+    );
+
+  if (generator?.content) {
+    technologies.add(
+      generator.content.trim()
+    );
+  }
+
+  const assets = Array.from(
+    document.querySelectorAll(
+      "script[src], link[href]"
+    )
+  )
+    .map((element) =>
+      element.src || element.href || ""
+    )
+    .join(" ")
+    .toLowerCase();
+
+  if (assets.includes("jquery")) {
+    technologies.add("jQuery");
+  }
+
+  if (assets.includes("bootstrap")) {
+    technologies.add("Bootstrap");
+  }
+
+  if (assets.includes("lodash")) {
+    technologies.add("Lodash");
+  }
+
+  if (
+    assets.includes("/_next/") ||
+    document.querySelector("#__next")
+  ) {
+    technologies.add("Next.js");
+  }
+
+  if (
+    assets.includes("react") ||
+    document.querySelector("[data-reactroot]")
+  ) {
+    technologies.add("React");
+  }
+
+  if (
+    assets.includes("angular") ||
+    document.querySelector(
+      "[ng-app], [ng-version]"
+    )
+  ) {
+    technologies.add("Angular");
+  }
+
+  if (
+    assets.includes("vue.js") ||
+    assets.includes("vue.min.js") ||
+    document.querySelector("[data-v-app]")
+  ) {
+    technologies.add("Vue.js");
+  }
+
+  if (
+    assets.includes("wp-content") ||
+    assets.includes("wp-includes") ||
+    generator?.content
+      ?.toLowerCase()
+      .includes("wordpress")
+  ) {
+    technologies.add("WordPress");
+  }
+
+  return Array.from(technologies);
+}
+
+
+function detectCaptchaSurface() {
+  return Boolean(
+    document.querySelector(
+      '.g-recaptcha, iframe[src*="recaptcha"], input[name*="captcha" i]'
+    )
+  );
+}
+
+
+function collectLinks() {
+  return Array.from(
+    document.querySelectorAll("a[href]")
+  )
+    .slice(0, 200)
+    .map((anchor) => anchor.href);
+}
+
+
+function gatherPassiveDomData() {
+  return {
+    url: location.href,
+    origin: location.origin,
+    title: document.title,
+
+    isHttps:
+      location.protocol === "https:",
+
+    forms: collectForms(),
+
+    scripts: collectScripts(),
+
+    domAnalysis:
+      analyzeDomJavascript(),
+
+    mixedContent:
+      detectMixedContent(),
+
+    technologies:
+      fingerprintTechnology(),
+
+    captchaSurface:
+      detectCaptchaSurface(),
+
+    links:
+      collectLinks(),
+
+    linkCount:
+      document.querySelectorAll("a[href]").length
+  };
+}
+
+
+chrome.runtime.onMessage.addListener(
+  (message, sender, sendResponse) => {
+    if (
+      message?.type !==
+        "COLLECT_PASSIVE_DOM_DATA" &&
+      message?.action !==
+        "COLLECT_PAGE_DATA"
+    ) {
+      return false;
+    }
+
+    sendResponse(
+      gatherPassiveDomData()
+    );
+
+    return false;
+  }
+);
