@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Web Vulnerability Scanner</title>
+<link rel="stylesheet" href="/dashboard/dashboard.css" />
+<script src="/dashboard/chart.umd.min.js"></script>
+</head>
+<body data-theme="dark">
+<div class="app-shell">
+
+  <aside class="sidebar glass-panel" id="sidebar">
+    <div class="brand-block">
+      <div class="logo-badge">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L4 5v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V5l-8-3z" fill="#fff" fill-opacity="0.92"/>
+          <path d="M9.5 12.2l1.8 1.8 3.4-3.8" stroke="#0ea5e9" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div>
+        <h1>Web Vulnerability Scanner</h1>
+        <p>Live Dashboard</p>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#overview" class="sidebar-item active" data-section="overview"><span class="icon">📊</span> Dashboard</a>
+      <a href="#history" class="sidebar-item" data-section="history"><span class="icon">🕘</span> Scan History</a>
+      <a href="#vulnerabilities" class="sidebar-item" data-section="vulnerabilities"><span class="icon">🛡️</span> Findings</a>
+      <a href="#reports" class="sidebar-item" data-section="reports"><span class="icon">📄</span> Reports</a>
+      <a href="#analytics" class="sidebar-item" data-section="analytics"><span class="icon">📈</span> Analytics</a>
+      <a href="#recommendations" class="sidebar-item" data-section="recommendations"><span class="icon">✅</span> Recommendations</a>
+      <a href="#settings" class="sidebar-item" data-section="settings"><span class="icon">⚙️</span> Settings</a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="status-card">
+        <div class="status-row">
+          <span class="dot"></span>
+          <div>
+            <p>System Status</p>
+            <p>All Systems Operational</p>
+          </div>
+        </div>
+        <div class="status-row">
+          <span class="icon">🗄️</span>
+          <div>
+            <p>Database</p>
+            <p>SQLite</p>
+          </div>
+        </div>
+        <div class="status-row">
+          <span class="icon">🌳</span>
+          <div>
+            <p>ML Model</p>
+            <p>Decision Tree</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="menu-btn" id="menuToggle" aria-label="Toggle navigation">☰</button>
+        <div class="datetime">
+          <span>📅</span>
+          <span id="topbarDate">—</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button id="themeToggle" class="theme-toggle">🌓 Theme</button>
+        <button id="exportCsvBtn" class="btn-outline">Export CSV</button>
+        <div class="account-chip">
+          <span class="avatar">SG</span>
+          <span>Security Admin</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <section id="overview" class="section">
+        <div class="page-heading-row">
+          <div class="page-heading">
+            <h2>Dashboard Overview</h2>
+            <p>Security posture at a glance</p>
+            <p id="activeSiteLabel" class="context-note">Showing all available scan results</p>
+          </div>
+          <button class="btn-primary" id="refreshBtn">⟳ Refresh Data</button>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-icon total">🗂️</div>
+            <div class="stat-body">
+              <p class="label">Scans for This Site</p>
+              <h2 id="totalScans">0</h2>
+              <span class="stat-delta flat" id="totalScansDelta">—</span>
+            </div>
+          </div>
+          <div class="stat-card clickable" data-risk-tier="high" title="Click to show high-risk findings">
+            <div class="stat-icon high">🔴</div>
+            <div class="stat-body">
+              <p class="label">High Risk</p>
+              <h2 id="highRiskCount">0</h2>
+              <span class="stat-detail">Critical or high severity issues</span>
+              <span class="stat-delta flat" id="highRiskDelta">—</span>
+            </div>
+          </div>
+          <div class="stat-card clickable" data-risk-tier="medium" title="Click to show medium-risk findings">
+            <div class="stat-icon medium">🟠</div>
+            <div class="stat-body">
+              <p class="label">Medium Risk</p>
+              <h2 id="mediumRiskCount">0</h2>
+              <span class="stat-detail">Moderate issues needing attention</span>
+              <span class="stat-delta flat" id="mediumRiskDelta">—</span>
+            </div>
+          </div>
+          <div class="stat-card clickable" data-risk-tier="low" title="Click to show low-risk findings">
+            <div class="stat-icon low">🟢</div>
+            <div class="stat-body">
+              <p class="label">Low Risk</p>
+              <h2 id="lowRiskCount">0</h2>
+              <span class="stat-detail">Minor or low severity findings</span>
+              <span class="stat-delta flat" id="lowRiskDelta">—</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon reports">📄</div>
+            <div class="stat-body">
+              <p class="label">Reports for This Site</p>
+              <h2 id="reportsGenerated">0</h2>
+              <span class="stat-delta flat" id="reportsDelta">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Risk Distribution</h3>
+              </div>
+            </div>
+            <div class="donut-wrap">
+              <div class="donut-canvas-wrap">
+                <canvas id="riskDistributionChart"></canvas>
+              </div>
+              <div class="donut-legend" id="riskDistributionLegend"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Failed Scans</h3>
+            </div>
+            <button class="btn-outline" data-section-link="history">View All</button>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>URL</th>
+                  <th>Risk Level</th>
+                  <th>Confidence</th>
+                  <th>Scan Type</th>
+                  <th>Date &amp; Time</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="recentScansBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="two-col-row">
+          <div class="panel">
+            <div class="panel-header"><h3>Top Findings</h3></div>
+            <ul class="findings-list" id="topFindingsList"></ul>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header"><h3>Decision Tree Prediction</h3></div>
+            <svg class="tree-diagram" viewBox="0 0 280 190" xmlns="http://www.w3.org/2000/svg">
+              <g class="tree-node">
+                <rect x="90" y="4" width="100" height="30" rx="8"/>
+                <text x="140" y="23" text-anchor="middle">HTTPS Used?</text>
+              </g>
+              <path class="tree-edge" d="M120 34 L60 62"/>
+              <text class="tree-edge-label" x="78" y="52">Yes</text>
+              <path class="tree-edge" d="M160 34 L220 62"/>
+              <text class="tree-edge-label" x="196" y="52">No</text>
+
+              <g class="tree-node">
+                <rect x="10" y="62" width="110" height="30" rx="8"/>
+                <text x="65" y="81" text-anchor="middle" style="font-size:9px">Headers Missing?</text>
+              </g>
+              <g class="tree-node">
+                <rect x="165" y="62" width="115" height="30" rx="8"/>
+                <text x="222" y="81" text-anchor="middle" style="font-size:8.5px">SQLi / Reflected Params?</text>
+              </g>
+
+              <path class="tree-edge" d="M40 92 L30 120"/>
+              <text class="tree-edge-label" x="10" y="112">No</text>
+              <path class="tree-edge" d="M90 92 L100 120"/>
+              <text class="tree-edge-label" x="98" y="112">Yes</text>
+              <path class="tree-edge" d="M195 92 L185 120"/>
+              <text class="tree-edge-label" x="163" y="112">No</text>
+              <path class="tree-edge" d="M250 92 L255 120"/>
+              <text class="tree-edge-label" x="252" y="112">Yes</text>
+
+              <g class="tree-node tree-leaf low">
+                <rect x="0" y="120" width="60" height="28" rx="8"/>
+                <text x="30" y="138" text-anchor="middle" style="font-size:9px">LOW RISK</text>
+              </g>
+              <g class="tree-node tree-leaf medium">
+                <rect x="70" y="120" width="80" height="28" rx="8"/>
+                <text x="110" y="138" text-anchor="middle" style="font-size:8.5px">MEDIUM RISK</text>
+              </g>
+              <g class="tree-node tree-leaf medium">
+                <rect x="160" y="120" width="80" height="28" rx="8"/>
+                <text x="200" y="138" text-anchor="middle" style="font-size:8.5px">MEDIUM RISK</text>
+              </g>
+              <g class="tree-node tree-leaf high">
+                <rect x="230" y="120" width="50" height="28" rx="8"/>
+                <text x="255" y="138" text-anchor="middle" style="font-size:9px">HIGH RISK</text>
+              </g>
+            </svg>
+          </div>
+
+          <div class="panel export-panel">
+            <div class="panel-header"><h3>Export Reports</h3></div>
+            <p class="desc">Download scan results for documentation and review.</p>
+            <div class="export-actions">
+              <button class="btn-block pdf" id="exportPdfBtn">⭳ Export as PDF</button>
+              <button class="btn-block csv" id="exportCsvBtn2">⭳ Export as CSV</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="history" class="section hidden">
+        <div class="page-heading">
+          <h2>Scan History</h2>
+          <p>Every scan recorded by Web Vulnerability Scanner</p>
+        </div>
+        <div class="panel">
+          <div class="filters-bar">
+            <div class="search-wrap">
+              <input type="text" id="historySearchInput" placeholder="Search by URL" />
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>URL</th>
+                  <th>Date</th>
+                  <th>Classification</th>
+                  <th>Confidence</th>
+                  <th>Active Scan</th>
+                  <th>Report</th>
+                </tr>
+              </thead>
+              <tbody id="historyTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="vulnerabilities" class="section hidden">
+        <div class="page-heading-row">
+          <div class="page-heading">
+            <h2>Findings</h2>
+            <p>All vulnerabilities detected across scans</p>
+          </div>
+          <button id="backToOverviewBtn" type="button" class="btn-outline">← Back to Overview</button>
+        </div>
+
+        <div class="panel">
+          <div class="filters-bar">
+            <div class="search-wrap">
+              <input type="text" id="searchInput" placeholder="Search by URL" />
+            </div>
+            <label class="filter-wrap">
+              <span>Severity</span>
+              <select id="severityFilter">
+                <option value="">All</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </label>
+            <label class="filter-wrap">
+              <span>Status</span>
+              <select id="statusFilter">
+                <option value="">All</option>
+                <option value="fail">Fail</option>
+                <option value="warning">Warning</option>
+                <option value="pass">Pass</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="table-scroll">
+            <table class="data-table findings-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Vulnerability</th>
+                  <th>Severity</th>
+                  <th>Description</th>
+                  <th>Recommendation</th>
+                  <th>Status</th>
+                  <th>URL</th>
+                </tr>
+              </thead>
+              <tbody id="vulnTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="two-col-row">
+          <div class="panel">
+            <div class="panel-header"><h3>Findings by Severity</h3></div>
+            <div class="chart-box" style="height:220px"><canvas id="severityChart"></canvas></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header"><h3>Missing Security Headers</h3></div>
+            <div class="chart-box" style="height:220px"><canvas id="headerCoverageChart"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="reports" class="section hidden">
+        <div class="page-heading">
+          <h2>Report Center</h2>
+          <p>Generated documentation for recent scans</p>
+        </div>
+        <div class="panel report-panel">
+          <div class="report-grid">
+            <div class="report-card">
+              <p>Latest PDF</p>
+              <strong>vulnscan_latest.pdf</strong>
+            </div>
+            <div class="report-card">
+              <p>CSV Export</p>
+              <strong>scan_history_export.csv</strong>
+            </div>
+            <div class="report-card">
+              <p>Recent Summary</p>
+              <strong id="reportsSummaryText">0 scans tracked</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="analytics" class="section hidden">
+        <div class="page-heading">
+          <h2>Analytics Snapshot</h2>
+          <p>How the scanner and dataset are trending</p>
+        </div>
+        <div class="panel analytics-panel">
+          <div class="analytics-grid">
+            <div class="report-card">
+              <p>Prediction Stability</p>
+              <strong>Healthy</strong>
+            </div>
+            <div class="report-card">
+              <p>Header Hygiene</p>
+              <strong>Moderate</strong>
+            </div>
+            <div class="report-card">
+              <p>Scan Trend</p>
+              <strong id="scanTrendText">—</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="recommendations" class="section hidden">
+        <div class="page-heading">
+          <h2>Priority Recommendations</h2>
+          <p>Fixes ranked by how often they show up in recent scans</p>
+          <p class="context-note">Warnings mean the issue is medium severity: important to fix soon, but not an immediate failure.</p>
+        </div>
+        <div class="panel recommendation-standalone">
+          <ul id="recommendationList" class="standalone-list"></ul>
+        </div>
+      </section>
+
+      <section id="settings" class="section hidden">
+        <div class="page-heading">
+          <h2>Dashboard Settings</h2>
+          <p>Preferences for this Web Vulnerability Scanner instance</p>
+        </div>
+        <div class="panel settings-panel">
+          <div class="report-grid">
+            <div class="report-card">
+              <p>Mode</p>
+              <strong>Live Monitoring</strong>
+            </div>
+            <div class="report-card">
+              <p>Theme</p>
+              <strong>Dark / Light Toggle</strong>
+            </div>
+            <div class="report-card">
+              <p>Export</p>
+              <strong>CSV &amp; PDF enabled</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer style="padding:14px 26px;color:var(--text-dim);font-size:11.5px;display:flex;justify-content:space-between;border-top:1px solid var(--border);">
+      <span>© 2026 Web Vulnerability Scanner | Built with Flask, SQLite &amp; Decision Tree ML</span>
+      <span>v1.0.0</span>
+    </footer>
+  </div>
+</div>
+
+<script src="/dashboard/history.js"></script>
+<script src="/dashboard/filters.js"></script>
+<script src="/dashboard/export.js"></script>
+<script src="/dashboard/charts.js"></script>
+<script src="/dashboard/dashboard.js"></script>
+</body>
+</html>
